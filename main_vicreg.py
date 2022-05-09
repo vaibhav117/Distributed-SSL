@@ -32,13 +32,11 @@ def get_arguments():
     parser.add_argument("--data-dir", type=Path, default="/path/to/imagenet", required=True,
                         help='Path to the image net dataset')
 
-    parser.add_argument("--dataset", type=str, default="CIFAR10", required=True, help='Path to the image net dataset')
+    parser.add_argument("--dataset", type=str, default="CIFAR10", help='Dataset to be used')
 
     # Checkpoints
-    parser.add_argument("--exp-dir", type=Path, default="./exp",
-                        help='Path to the experiment folder, where all logs/checkpoints will be stored')
-    parser.add_argument("--log-freq-time", type=int, default=60,
-                        help='Print logs to the stats.txt file every [log-freq-time] seconds')
+    parser.add_argument("--exp-dir", type=Path, default="./experiments", help='Path to the experiment folder, where all logs/checkpoints will be stored')
+    parser.add_argument("--log-freq-time", type=int, default=60, help='Print logs to the stats.txt file every [log-freq-time] seconds')
 
     # Model
     parser.add_argument("--arch", type=str, default="resnet50",
