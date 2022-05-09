@@ -32,6 +32,8 @@ def get_arguments():
     parser.add_argument("--data-dir", type=Path, default="/path/to/imagenet", required=True,
                         help='Path to the image net dataset')
 
+    parser.add_argument("--dataset", type=str, default="CIFAR10", required=True, help='Path to the image net dataset')
+
     # Checkpoints
     parser.add_argument("--exp-dir", type=Path, default="./exp",
                         help='Path to the experiment folder, where all logs/checkpoints will be stored')
@@ -91,7 +93,13 @@ def main(args):
 
     transforms = aug.TrainTransform()
 
-    dataset = datasets.ImageFolder(args.data_dir / "train", transforms)
+    if args.dataset == "imagenet":
+        dataset = datasets.ImageFolder(f"{args.data_dir}/train", transforms)
+    elif args.dataset == "CIFAR10":
+        dataset = datasets.CIFAR10(root='./CIFAR10', download=True, transform=transforms)
+    elif args.dataset == "tiny-imagenet":
+        dataset = datasets.ImageFolder("./tiny-imagenet-200/train", transforms)
+
     sampler = torch.utils.data.distributed.DistributedSampler(dataset, shuffle=True)
     assert args.batch_size % args.world_size == 0
     per_device_batch_size = args.batch_size // args.world_size
