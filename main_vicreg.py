@@ -191,7 +191,7 @@ def main(args):
                 )
                 print(json.dumps(stats))
                 print(json.dumps(stats), file=stats_file)
-                wandb.log({ "unsupervised_loss": loss , "train_accuracy": train_accuracy , "runtime": int(current_time - start_time), "epoch": epoch })
+                wandb.log({ "backbone_loss": loss, "head_loss": head_loss, "train_accuracy": train_accuracy , "runtime": int(current_time - start_time), "epoch": epoch })
                 last_logging = current_time
 
         if args.rank == 0:
