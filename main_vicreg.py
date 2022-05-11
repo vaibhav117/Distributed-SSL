@@ -40,7 +40,7 @@ def get_arguments():
     parser.add_argument("--gpu-type", type=str, default="A100", required=True, help='Name of the run')
     parser.add_argument("--exp-dir", type=Path, default="./experiments", help='Path to the experiment folder, where all logs/checkpoints will be stored')
     parser.add_argument("--log-freq-time", type=int, default=60, help='Print logs to the stats.txt file every [log-freq-time] seconds')
-    parser.add_argument("--eval-run-at", type=int, default=5, help='Numebr of epochs after which eval loop is to be run')
+    parser.add_argument("--eval-run-at", type=int, default=1, help='Numebr of epochs after which eval loop is to be run')
 
     # Model
     parser.add_argument("--arch", type=str, default="resnet50", help='Architecture of the backbone encoder network')
@@ -163,7 +163,14 @@ def main(args):
             if args.rank == 0 and epoch%args.eval_run_at==0:
                 train_accuracy = 0
 
+                supervised_optim = optim.SGD(model.parameters(), lr=0.001, momentum=0.9, weight_decay=5e-4)
+                supervised_optim.zero_grad()
+
                 outputs = head(backbone_out_x.float())
+                
+                head_loss = torch.nn.CrossEntropyLoss()(outputs, targets)
+                head_loss.backward()
+
                 _, predicted = outputs.max(1)
                 total_train = targets.size(0)
                 correct_train = predicted.eq(targets).sum().item()
@@ -184,7 +191,7 @@ def main(args):
                 )
                 print(json.dumps(stats))
                 print(json.dumps(stats), file=stats_file)
-                wandb.log({ "loss": loss , "train_accuracy": train_accuracy , "runtime": int(current_time - start_time), "epoch": epoch })
+                wandb.log({ "unsupervised_loss": loss , "train_accuracy": train_accuracy , "runtime": int(current_time - start_time), "epoch": epoch })
                 last_logging = current_time
 
         if args.rank == 0:
