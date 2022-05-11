@@ -5,6 +5,7 @@
 # LICENSE file in the root directory of this source tree.
 
 
+from ast import arg
 from pathlib import Path
 import argparse
 import json
@@ -12,10 +13,11 @@ import math
 import os
 import sys
 import time
+import wandb
 
 import torch
 import torch.nn.functional as F
-from torch import nn, optim
+from torch import embedding, nn, optim
 import torch.distributed as dist
 import torchvision.datasets as datasets
 
@@ -29,84 +31,81 @@ def get_arguments():
     parser = argparse.ArgumentParser(description="Pretrain a resnet model with VICReg", add_help=False)
 
     # Data
-    parser.add_argument("--data-dir", type=Path, default="/path/to/imagenet", required=True,
-                        help='Path to the image net dataset')
-
+    parser.add_argument("--data-dir", type=Path, default="/path/to/imagenet", required=True, help='Path to the image net dataset')
     parser.add_argument("--dataset", type=str, default="CIFAR10", help='Dataset to be used')
 
     # Checkpoints
+    parser.add_argument("--tta-accuracy", type=float, default=70.0, help='TTA Accuracy')
+    parser.add_argument("--run-name", type=str, default="run_name", required=True, help='Name of the run')
+    parser.add_argument("--gpu-type", type=str, default="A100", required=True, help='Name of the run')
     parser.add_argument("--exp-dir", type=Path, default="./experiments", help='Path to the experiment folder, where all logs/checkpoints will be stored')
     parser.add_argument("--log-freq-time", type=int, default=60, help='Print logs to the stats.txt file every [log-freq-time] seconds')
+    parser.add_argument("--eval-run-at", type=int, default=5, help='Numebr of epochs after which eval loop is to be run')
 
     # Model
-    parser.add_argument("--arch", type=str, default="resnet50",
-                        help='Architecture of the backbone encoder network')
-    parser.add_argument("--mlp", default="8192-8192-8192",
-                        help='Size and number of layers of the MLP expander head')
+    parser.add_argument("--arch", type=str, default="resnet50", help='Architecture of the backbone encoder network')
+    parser.add_argument("--mlp", default="8192-8192-8192", help='Size and number of layers of the MLP expander head')
 
     # Optim
-    parser.add_argument("--epochs", type=int, default=100,
-                        help='Number of epochs')
-    parser.add_argument("--batch-size", type=int, default=2048,
-                        help='Effective batch size (per worker batch size is [batch-size] / world-size)')
-    parser.add_argument("--base-lr", type=float, default=0.2,
-                        help='Base learning rate, effective learning after warmup is [base-lr] * [batch-size] / 256')
-    parser.add_argument("--wd", type=float, default=1e-6,
-                        help='Weight decay')
+    parser.add_argument("--epochs", type=int, default=100, help='Number of epochs')
+    parser.add_argument("--batch-size", type=int, default=2048, help='Effective batch size (per worker batch size is [batch-size] / world-size)')
+    parser.add_argument("--base-lr", type=float, default=0.2, help='Base learning rate, effective learning after warmup is [base-lr] * [batch-size] / 256')
+    parser.add_argument("--wd", type=float, default=1e-6, help='Weight decay')
 
     # Loss
-    parser.add_argument("--sim-coeff", type=float, default=25.0,
-                        help='Invariance regularization loss coefficient')
-    parser.add_argument("--std-coeff", type=float, default=25.0,
-                        help='Variance regularization loss coefficient')
-    parser.add_argument("--cov-coeff", type=float, default=1.0,
-                        help='Covariance regularization loss coefficient')
+    parser.add_argument("--sim-coeff", type=float, default=25.0, help='Invariance regularization loss coefficient')
+    parser.add_argument("--std-coeff", type=float, default=25.0, help='Variance regularization loss coefficient')
+    parser.add_argument("--cov-coeff", type=float, default=1.0, help='Covariance regularization loss coefficient')
 
     # Running
     parser.add_argument("--num-workers", type=int, default=10)
-    parser.add_argument('--device', default='cuda',
-                        help='device to use for training / testing')
+    parser.add_argument('--device', default='cuda', help='device to use for training / testing')
 
     # Distributed
-    parser.add_argument('--world-size', default=1, type=int,
-                        help='number of distributed processes')
+    parser.add_argument('--world-size', default=1, type=int, help='number of distributed processes')
     parser.add_argument('--local_rank', default=-1, type=int)
-    parser.add_argument('--dist-url', default='env://',
-                        help='url used to set up distributed training')
+    parser.add_argument('--dist-url', default='env://', help='url used to set up distributed training')
 
     return parser
 
 
 def main(args):
     torch.backends.cudnn.benchmark = True
+    if args.dataset == "CIFAR10":
+        number_of_classes = 10
+    elif args.dataset == "imagenet" or args.dataset == "tiny-imagenet":
+        number_of_classes = 1000
+
     init_distributed_mode(args)
     print(args)
     gpu = torch.device(args.device)
 
     if args.rank == 0:
         args.exp_dir.mkdir(parents=True, exist_ok=True)
-        stats_file = open(args.exp_dir / "stats.txt", "a", buffering=1)
+        wandb.init(project=f"HPML-project_{args.arch}" , name=f"{args.run_name}", tags=["train",f"{args.gpu_type}",f"{args.batch_size}",f"{args.world_size}",f"{args.tta_accuracy}",f"{args.dataset}",f"{args.arch}"])
+        os.makedirs(os.path.dirname(f"{args.exp_dir}/{args.run_name}/"), exist_ok=True)
+        stats_file = open(args.exp_dir / args.run_name / "stats.txt", "a", buffering=1)
         print(" ".join(sys.argv))
         print(" ".join(sys.argv), file=stats_file)
 
     transforms = aug.TrainTransform()
 
     if args.dataset == "imagenet":
-        dataset = datasets.ImageFolder(f"{args.data_dir}/train", transforms)
+        train_dataset = datasets.ImageFolder(f"{args.data_dir}/train", transforms)
     elif args.dataset == "CIFAR10":
-        dataset = datasets.CIFAR10(root='./CIFAR10', download=True, transform=transforms)
+        train_dataset = datasets.CIFAR10(root='./CIFAR10', download=True, transform=transforms)
     elif args.dataset == "tiny-imagenet":
-        dataset = datasets.ImageFolder("./tiny-imagenet-200/train", transforms)
+        train_dataset = datasets.ImageFolder("./tiny-imagenet-200/train", transforms)
 
-    sampler = torch.utils.data.distributed.DistributedSampler(dataset, shuffle=True)
+    train_sampler = torch.utils.data.distributed.DistributedSampler(train_dataset, shuffle=True)
     assert args.batch_size % args.world_size == 0
     per_device_batch_size = args.batch_size // args.world_size
-    loader = torch.utils.data.DataLoader(
-        dataset,
+    train_loader = torch.utils.data.DataLoader(
+        train_dataset,
         batch_size=per_device_batch_size,
         num_workers=args.num_workers,
         pin_memory=True,
-        sampler=sampler,
+        sampler=train_sampler,
     )
 
     model = VICReg(args).cuda(gpu)
@@ -120,34 +119,61 @@ def main(args):
         lars_adaptation_filter=exclude_bias_and_norm,
     )
 
-    if (args.exp_dir / "model.pth").is_file():
+    #----------- ADDING CLASSIFIER HEAD ---------------
+    backbone, embedding = resnet.__dict__[args.arch](zero_init_residual=True)
+    head = nn.Linear(embedding, number_of_classes).cuda(gpu)
+    head.weight.data.normal_(mean=0.0, std=0.01)
+    head.bias.data.zero_()
+    head = torch.nn.parallel.DistributedDataParallel(head, device_ids=[gpu])
+    #--------------------------------------------------
+
+    if (args.exp_dir / args.run_name / "model.pth").is_file():
         if args.rank == 0:
             print("resuming from checkpoint")
-        ckpt = torch.load(args.exp_dir / "model.pth", map_location="cpu")
+        ckpt = torch.load(args.exp_dir / args.run_name / "model.pth", map_location="cpu")
         start_epoch = ckpt["epoch"]
         model.load_state_dict(ckpt["model"])
         optimizer.load_state_dict(ckpt["optimizer"])
+        head.load_state_dict(ckpt["head"])
     else:
         start_epoch = 0
 
     start_time = last_logging = time.time()
     scaler = torch.cuda.amp.GradScaler()
+    best_train_accuracy = 0
+
     for epoch in range(start_epoch, args.epochs):
-        sampler.set_epoch(epoch)
-        for step, ((x, y), _) in enumerate(loader, start=epoch * len(loader)):
+        train_sampler.set_epoch(epoch)
+        for step, ((x, y), targets) in enumerate(train_loader, start=epoch * len(train_loader)):
+            targets = targets.cuda(gpu, non_blocking=True)
             x = x.cuda(gpu, non_blocking=True)
             y = y.cuda(gpu, non_blocking=True)
 
-            lr = adjust_learning_rate(args, optimizer, loader, step)
+            lr = adjust_learning_rate(args, optimizer, train_loader, step)
 
             optimizer.zero_grad()
             with torch.cuda.amp.autocast():
-                loss = model.forward(x, y)
+                loss, backbone_out_x, backbone_out_y = model.forward(x, y)
             scaler.scale(loss).backward()
             scaler.step(optimizer)
             scaler.update()
 
             current_time = time.time()
+
+            if args.rank == 0 and epoch%args.eval_run_at==0:
+                train_accuracy = 0
+
+                outputs = head(backbone_out_x.float())
+                _, predicted = outputs.max(1)
+                total_train = targets.size(0)
+                correct_train = predicted.eq(targets).sum().item()
+                train_accuracy = correct_train/total_train
+
+                if train_accuracy > best_train_accuracy:
+                    torch.save(model.module.backbone.state_dict(), args.exp_dir / args.run_name / "best_backbone.pth")
+                    torch.save(head.state_dict(), args.exp_dir / args.run_name / "best_head.pth")
+                pass
+
             if args.rank == 0 and current_time - last_logging > args.log_freq_time:
                 stats = dict(
                     epoch=epoch,
@@ -158,16 +184,20 @@ def main(args):
                 )
                 print(json.dumps(stats))
                 print(json.dumps(stats), file=stats_file)
+                wandb.log({ "loss": loss , "train_accuracy": train_accuracy , "runtime": int(current_time - start_time), "epoch": epoch })
                 last_logging = current_time
+
         if args.rank == 0:
             state = dict(
                 epoch=epoch + 1,
                 model=model.state_dict(),
                 optimizer=optimizer.state_dict(),
+                head=head.state_dict(),
             )
-            torch.save(state, args.exp_dir / "model.pth")
+            torch.save(state, args.exp_dir / args.run_name / "model.pth")
     if args.rank == 0:
-        torch.save(model.module.backbone.state_dict(), args.exp_dir / "resnet50.pth")
+        torch.save(model.module.backbone.state_dict(), args.exp_dir / args.run_name / "final_resnet50.pth")
+        torch.save(head.state_dict(), args.exp_dir / args.run_name / "final_resnet50.pth")
 
 
 def adjust_learning_rate(args, optimizer, loader, step):
@@ -198,8 +228,10 @@ class VICReg(nn.Module):
         self.projector = Projector(args, self.embedding)
 
     def forward(self, x, y):
-        x = self.projector(self.backbone(x))
-        y = self.projector(self.backbone(y))
+        backbone_out_x = self.backbone(x)
+        backbone_out_y = self.backbone(y)
+        x = self.projector(backbone_out_x)
+        y = self.projector(backbone_out_y)
 
         repr_loss = F.mse_loss(x, y)
 
@@ -223,7 +255,7 @@ class VICReg(nn.Module):
             + self.args.std_coeff * std_loss
             + self.args.cov_coeff * cov_loss
         )
-        return loss
+        return loss, backbone_out_x.detach().clone(), backbone_out_y.detach().clone()
 
 
 def Projector(args, embedding):

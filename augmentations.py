@@ -35,7 +35,14 @@ class Solarization(object):
 
 
 class TrainTransform(object):
-    def __init__(self):
+    def __init__(self, dataset="CIFAR10"):
+        if dataset == 'imagenet' or dataset == 'tiny-imagenet':
+            self.mean = [0.485, 0.456, 0.406]
+            self.std = [0.229, 0.224, 0.225]
+        elif dataset == 'CIFAR10':
+            self.mean = [0.4914, 0.4822, 0.4465]
+            self.std = (0.2023, 0.1994, 0.2010)
+            
         self.transform = transforms.Compose(
             [
                 transforms.RandomResizedCrop(
@@ -55,7 +62,7 @@ class TrainTransform(object):
                 Solarization(p=0.0),
                 transforms.ToTensor(),
                 transforms.Normalize(
-                    mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]
+                    mean=self.mean, std=self.std
                 ),
             ]
         )
@@ -78,7 +85,7 @@ class TrainTransform(object):
                 Solarization(p=0.2),
                 transforms.ToTensor(),
                 transforms.Normalize(
-                    mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]
+                    mean=self.mean, std=self.std
                 ),
             ]
         )

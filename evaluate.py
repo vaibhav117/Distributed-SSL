@@ -15,6 +15,7 @@ import signal
 import sys
 import time
 import urllib
+from numpy import number
 
 from torch import nn, optim
 from torchvision import datasets, transforms
@@ -29,6 +30,7 @@ def get_arguments():
     )
 
     # Data
+    parser.add_argument("--dataset", type=str, default="CIFAR10", help='Dataset to be used')
     parser.add_argument("--data-dir", type=Path, help="path to dataset")
     parser.add_argument(
         "--train-percent",
@@ -121,6 +123,11 @@ def main():
 
 
 def main_worker(gpu, args):
+    if args.dataset == "CIFAR10":
+        number_of_classes = 10
+    elif args.dataset == "imagenet" or args.dataset == "tiny-imagenet":
+        number_of_classes = 1000
+
     args.rank += gpu
     torch.distributed.init_process_group(
         backend="nccl",
@@ -138,6 +145,7 @@ def main_worker(gpu, args):
     torch.cuda.set_device(gpu)
     torch.backends.cudnn.benchmark = True
 
+    
     backbone, embedding = resnet.__dict__[args.arch](zero_init_residual=True)
     state_dict = torch.load(args.pretrained, map_location="cpu")
     if "model" in state_dict:
@@ -148,7 +156,7 @@ def main_worker(gpu, args):
         }
     backbone.load_state_dict(state_dict, strict=False)
 
-    head = nn.Linear(embedding, 1000)
+    head = nn.Linear(embedding, number_of_classes)
     head.weight.data.normal_(mean=0.0, std=0.01)
     head.bias.data.zero_()
     model = nn.Sequential(backbone, head)
