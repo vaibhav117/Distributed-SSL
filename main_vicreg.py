@@ -222,8 +222,8 @@ def main(args):
                     total_train += targets.size(0)
                     correct_train += predicted.eq(targets).sum().item()
                     train_accuracy = correct_train/total_train
-                    if args.rank == 0:
-                        wandb.log({ "backbone_loss": loss, "head_loss": head_loss, "train_accuracy": train_accuracy, "best_train_accuracy": best_train_accuracy, "runtime": int(current_time - start_time), "epoch": epoch })
+                if args.rank == 0:
+                    wandb.log({ "backbone_loss": loss, "head_loss": head_loss, "train_accuracy": train_accuracy, "best_train_accuracy": best_train_accuracy, "runtime": int(current_time - start_time), "epoch": epoch })
 
             if args.rank == 0:
                 if train_accuracy > best_train_accuracy:
