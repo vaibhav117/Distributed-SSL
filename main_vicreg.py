@@ -228,6 +228,7 @@ def main(args):
 
             if args.rank == 0:
                 if train_accuracy > best_train_accuracy:
+                    best_train_accuracy = train_accuracy
                     torch.save(model.module.backbone.state_dict(), args.exp_dir / args.run_name / "best_backbone.pth")
                     torch.save(eval_head.state_dict(), args.exp_dir / args.run_name / "best_head.pth")
 
