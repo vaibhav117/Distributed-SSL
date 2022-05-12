@@ -217,6 +217,7 @@ def main(args):
                         
                     head_loss = torch.nn.CrossEntropyLoss()(outputs, targets)
                     head_loss.backward()
+                    supervised_optim.step()
 
                     _, predicted = outputs.max(1)
                     total_train += targets.size(0)
