@@ -159,23 +159,23 @@ def main(args):
             scaler.update()
 
             current_time = time.time()
+            
+            train_accuracy = 0
+
+            supervised_optim = optim.SGD(head.parameters(), lr=0.001, momentum=0.9, weight_decay=5e-4)
+            supervised_optim.zero_grad()
+
+            outputs = head(backbone_out_x.float())
+                
+            head_loss = torch.nn.CrossEntropyLoss()(outputs, targets)
+            head_loss.backward()
+
+            _, predicted = outputs.max(1)
+            total_train = targets.size(0)
+            correct_train = predicted.eq(targets).sum().item()
+            train_accuracy = correct_train/total_train
 
             if args.rank == 0 and epoch%args.eval_run_at==0:
-                train_accuracy = 0
-
-                supervised_optim = optim.SGD(model.parameters(), lr=0.001, momentum=0.9, weight_decay=5e-4)
-                supervised_optim.zero_grad()
-
-                outputs = head(backbone_out_x.float())
-                
-                head_loss = torch.nn.CrossEntropyLoss()(outputs, targets)
-                head_loss.backward()
-
-                _, predicted = outputs.max(1)
-                total_train = targets.size(0)
-                correct_train = predicted.eq(targets).sum().item()
-                train_accuracy = correct_train/total_train
-
                 if train_accuracy > best_train_accuracy:
                     torch.save(model.module.backbone.state_dict(), args.exp_dir / args.run_name / "best_backbone.pth")
                     torch.save(head.state_dict(), args.exp_dir / args.run_name / "best_head.pth")
