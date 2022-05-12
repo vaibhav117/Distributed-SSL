@@ -13,12 +13,14 @@ import math
 import os
 import sys
 import time
+from matplotlib import image
 import wandb
 
 import torch
 import torch.nn.functional as F
 from torch import embedding, nn, optim
 import torch.distributed as dist
+import torchvision.transforms as transforms
 import torchvision.datasets as datasets
 
 import augmentations as aug
@@ -40,7 +42,8 @@ def get_arguments():
     parser.add_argument("--gpu-type", type=str, default="A100", required=True, help='Name of the run')
     parser.add_argument("--exp-dir", type=Path, default="./experiments", help='Path to the experiment folder, where all logs/checkpoints will be stored')
     parser.add_argument("--log-freq-time", type=int, default=60, help='Print logs to the stats.txt file every [log-freq-time] seconds')
-    parser.add_argument("--eval-run-at", type=int, default=1, help='Numebr of epochs after which eval loop is to be run')
+    parser.add_argument("--eval-run-at", type=int, default=5, help='Numeber of epochs after which eval loop is to be run')
+    parser.add_argument("--eval-epochs", type=int, default=5, help='Numeber of epochs to train the eval head in the eval loop')
 
     # Model
     parser.add_argument("--arch", type=str, default="resnet50", help='Architecture of the backbone encoder network')
@@ -73,6 +76,8 @@ def main(args):
     torch.backends.cudnn.benchmark = True
     if args.dataset == "CIFAR10":
         number_of_classes = 10
+        normal_mean = (0.4914, 0.4822, 0.4465)
+        normal_std = (0.2023, 0.1994, 0.2010)
     elif args.dataset == "imagenet" or args.dataset == "tiny-imagenet":
         number_of_classes = 1000
 
@@ -82,22 +87,31 @@ def main(args):
 
     if args.rank == 0:
         args.exp_dir.mkdir(parents=True, exist_ok=True)
+        os.environ["WANDB_API_KEY"] = "2c16efe7c984313117231fc78c356c497c7f5c87"
         wandb.init(project=f"HPML-project_{args.arch}" , name=f"{args.run_name}", tags=["train",f"{args.gpu_type}",f"{args.batch_size}",f"{args.world_size}",f"{args.tta_accuracy}",f"{args.dataset}",f"{args.arch}"])
         os.makedirs(os.path.dirname(f"{args.exp_dir}/{args.run_name}/"), exist_ok=True)
         stats_file = open(args.exp_dir / args.run_name / "stats.txt", "a", buffering=1)
         print(" ".join(sys.argv))
         print(" ".join(sys.argv), file=stats_file)
 
-    transforms = aug.TrainTransform()
+    train_transforms = aug.TrainTransform()
+
+    eval_transforms = transforms.Compose([
+        transforms.ToTensor(),
+        transforms.CenterCrop(224),
+        transforms.Normalize(normal_mean, normal_std)
+        ])
 
     if args.dataset == "imagenet":
-        train_dataset = datasets.ImageFolder(f"{args.data_dir}/train", transforms)
+        train_dataset = datasets.ImageFolder(f"{args.data_dir}/train", transform=train_transforms)
     elif args.dataset == "CIFAR10":
-        train_dataset = datasets.CIFAR10(root='./CIFAR10', download=True, transform=transforms)
+        train_dataset = datasets.CIFAR10(root='./CIFAR10', train=False, download=True, transform=train_transforms)
+        eval_dataset = datasets.CIFAR10(root='./CIFAR10', download=True, transform=eval_transforms)
     elif args.dataset == "tiny-imagenet":
-        train_dataset = datasets.ImageFolder("./tiny-imagenet-200/train", transforms)
+        train_dataset = datasets.ImageFolder("./tiny-imagenet-200/train", transform=train_transforms)
 
     train_sampler = torch.utils.data.distributed.DistributedSampler(train_dataset, shuffle=True)
+    eval_sampler = torch.utils.data.distributed.DistributedSampler(eval_dataset, shuffle=True)
     assert args.batch_size % args.world_size == 0
     per_device_batch_size = args.batch_size // args.world_size
     train_loader = torch.utils.data.DataLoader(
@@ -106,6 +120,13 @@ def main(args):
         num_workers=args.num_workers,
         pin_memory=True,
         sampler=train_sampler,
+    )
+    eval_loader = torch.utils.data.DataLoader(
+        eval_dataset,
+        batch_size=per_device_batch_size,
+        num_workers=args.num_workers,
+        pin_memory=True,
+        sampler=eval_sampler,
     )
 
     model = VICReg(args).cuda(gpu)
@@ -119,13 +140,18 @@ def main(args):
         lars_adaptation_filter=exclude_bias_and_norm,
     )
 
-    #----------- ADDING CLASSIFIER HEAD ---------------
-    backbone, embedding = resnet.__dict__[args.arch](zero_init_residual=True)
-    head = nn.Linear(embedding, number_of_classes).cuda(gpu)
-    head.weight.data.normal_(mean=0.0, std=0.01)
-    head.bias.data.zero_()
-    head = torch.nn.parallel.DistributedDataParallel(head, device_ids=[gpu])
-    #--------------------------------------------------
+    #------------------- ADDING EVAL CLASSIFIER ---------------
+    eval_backbone, embedding = resnet.__dict__[args.arch](zero_init_residual=True)
+    eval_head = nn.Linear(embedding, number_of_classes).cuda(gpu)
+    eval_head.weight.data.normal_(mean=0.0, std=0.01)
+    eval_head.bias.data.zero_()
+    eval_model = nn.Sequential(eval_backbone, eval_head)
+    eval_model.cuda(gpu)
+    eval_backbone.load_state_dict(model.module.backbone.state_dict())
+    eval_backbone.requires_grad_(False)
+    eval_head.requires_grad_(True)
+    eval_model = torch.nn.parallel.DistributedDataParallel(eval_model, device_ids=[gpu])
+    #---------------------------------------------------------
 
     if (args.exp_dir / args.run_name / "model.pth").is_file():
         if args.rank == 0:
@@ -134,18 +160,18 @@ def main(args):
         start_epoch = ckpt["epoch"]
         model.load_state_dict(ckpt["model"])
         optimizer.load_state_dict(ckpt["optimizer"])
-        head.load_state_dict(ckpt["head"])
+        eval_head.load_state_dict(ckpt["head"])
     else:
         start_epoch = 0
 
     start_time = last_logging = time.time()
     scaler = torch.cuda.amp.GradScaler()
     best_train_accuracy = 0
-
+    train_accuracy = 0
+    
     for epoch in range(start_epoch, args.epochs):
         train_sampler.set_epoch(epoch)
-        for step, ((x, y), targets) in enumerate(train_loader, start=epoch * len(train_loader)):
-            targets = targets.cuda(gpu, non_blocking=True)
+        for step, ((x,y), _) in enumerate(train_loader, start=epoch * len(train_loader)):
             x = x.cuda(gpu, non_blocking=True)
             y = y.cuda(gpu, non_blocking=True)
 
@@ -159,27 +185,6 @@ def main(args):
             scaler.update()
 
             current_time = time.time()
-            
-            train_accuracy = 0
-
-            supervised_optim = optim.SGD(head.parameters(), lr=0.001, momentum=0.9, weight_decay=5e-4)
-            supervised_optim.zero_grad()
-
-            outputs = head(backbone_out_x.float())
-                
-            head_loss = torch.nn.CrossEntropyLoss()(outputs, targets)
-            head_loss.backward()
-
-            _, predicted = outputs.max(1)
-            total_train = targets.size(0)
-            correct_train = predicted.eq(targets).sum().item()
-            train_accuracy = correct_train/total_train
-
-            if args.rank == 0 and epoch%args.eval_run_at==0:
-                if train_accuracy > best_train_accuracy:
-                    torch.save(model.module.backbone.state_dict(), args.exp_dir / args.run_name / "best_backbone.pth")
-                    torch.save(head.state_dict(), args.exp_dir / args.run_name / "best_head.pth")
-                pass
 
             if args.rank == 0 and current_time - last_logging > args.log_freq_time:
                 stats = dict(
@@ -191,20 +196,52 @@ def main(args):
                 )
                 print(json.dumps(stats))
                 print(json.dumps(stats), file=stats_file)
-                wandb.log({ "backbone_loss": loss, "head_loss": head_loss, "train_accuracy": train_accuracy , "runtime": int(current_time - start_time), "epoch": epoch })
                 last_logging = current_time
+        
+        if epoch%args.eval_run_at == 0:
+            eval_backbone.load_state_dict(model.module.backbone.state_dict())
+            eval_backbone.requires_grad_(False)
+            eval_head.requires_grad_(True)
+
+           
+            for eval_epoch in range(args.eval_epochs):
+                total_train = 0
+                correct_train = 0
+                for step, (image, targets) in enumerate(eval_loader, start=epoch * len(eval_loader)):
+                    targets = targets.cuda(gpu, non_blocking=True)
+                    image = image.cuda(gpu, non_blocking=True)
+                    supervised_optim = optim.SGD(eval_head.parameters(), lr=0.001, momentum=0.9, weight_decay=5e-4)
+                    supervised_optim.zero_grad()
+
+                    outputs = eval_model(image)
+                        
+                    head_loss = torch.nn.CrossEntropyLoss()(outputs, targets)
+                    head_loss.backward()
+
+                    _, predicted = outputs.max(1)
+                    total_train += targets.size(0)
+                    correct_train += predicted.eq(targets).sum().item()
+                    train_accuracy = correct_train/total_train
+                    if args.rank == 0:
+                        wandb.log({ "backbone_loss": loss, "head_loss": head_loss, "train_accuracy": train_accuracy, "best_train_accuracy": best_train_accuracy, "runtime": int(current_time - start_time), "epoch": epoch })
+
+            if args.rank == 0:
+                if train_accuracy > best_train_accuracy:
+                    torch.save(model.module.backbone.state_dict(), args.exp_dir / args.run_name / "best_backbone.pth")
+                    torch.save(eval_head.state_dict(), args.exp_dir / args.run_name / "best_head.pth")
 
         if args.rank == 0:
             state = dict(
                 epoch=epoch + 1,
                 model=model.state_dict(),
                 optimizer=optimizer.state_dict(),
-                head=head.state_dict(),
+                head=eval_head.state_dict(),
             )
+            wandb.log({ "backbone_loss": loss, "head_loss": head_loss, "train_accuracy": train_accuracy, "best_train_accuracy": best_train_accuracy, "runtime": int(current_time - start_time), "epoch": epoch })
             torch.save(state, args.exp_dir / args.run_name / "model.pth")
     if args.rank == 0:
         torch.save(model.module.backbone.state_dict(), args.exp_dir / args.run_name / "final_resnet50.pth")
-        torch.save(head.state_dict(), args.exp_dir / args.run_name / "final_resnet50.pth")
+        torch.save(eval_head.state_dict(), args.exp_dir / args.run_name / "final_resnet50.pth")
 
 
 def adjust_learning_rate(args, optimizer, loader, step):
