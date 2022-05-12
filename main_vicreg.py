@@ -167,6 +167,7 @@ def main(args):
     scaler = torch.cuda.amp.GradScaler()
     best_train_accuracy = 0
     train_accuracy = 0
+    head_loss = 0
     
     for epoch in range(start_epoch, args.epochs):
         train_sampler.set_epoch(epoch)
