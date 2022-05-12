@@ -87,7 +87,6 @@ def main(args):
 
     if args.rank == 0:
         args.exp_dir.mkdir(parents=True, exist_ok=True)
-        os.environ["WANDB_API_KEY"] = "2c16efe7c984313117231fc78c356c497c7f5c87"
         wandb.init(entity= 'hpml', project=f"HPML-project_{args.arch}" , name=f"{args.run_name}", tags=["train",f"{args.gpu_type}",f"{args.batch_size}",f"{args.world_size}",f"{args.tta_accuracy}",f"{args.dataset}",f"{args.arch}"])
         os.makedirs(os.path.dirname(f"{args.exp_dir}/{args.run_name}/"), exist_ok=True)
         stats_file = open(args.exp_dir / args.run_name / "stats.txt", "a", buffering=1)
