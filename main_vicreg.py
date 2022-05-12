@@ -80,6 +80,8 @@ def main(args):
         normal_std = (0.2023, 0.1994, 0.2010)
     elif args.dataset == "imagenet" or args.dataset == "tiny-imagenet":
         number_of_classes = 1000
+        normal_mean = [0.4914, 0.4822, 0.4465]
+        normal_std = (0.2023, 0.1994, 0.2010)
 
     init_distributed_mode(args)
     print(args)
