@@ -106,8 +106,8 @@ def main(args):
     if args.dataset == "imagenet":
         train_dataset = datasets.ImageFolder(f"{args.data_dir}/train", transform=train_transforms)
     elif args.dataset == "CIFAR10":
-        train_dataset = datasets.CIFAR10(root='./CIFAR10', train=False, download=True, transform=train_transforms)
-        eval_dataset = datasets.CIFAR10(root='./CIFAR10', download=True, transform=eval_transforms)
+        train_dataset = datasets.CIFAR10(root=f'{args.data_dir}/CIFAR10', train=False, download=True, transform=train_transforms)
+        eval_dataset = datasets.CIFAR10(root=f'{args.data_dir}/CIFAR10', download=True, transform=eval_transforms)
     elif args.dataset == "tiny-imagenet":
         train_dataset = datasets.ImageFolder("./tiny-imagenet-200/train", transform=train_transforms)
 
