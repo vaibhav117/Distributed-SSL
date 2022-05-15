@@ -71,10 +71,17 @@ def main(args):
         number_of_classes = 10
         normal_mean = (0.4914, 0.4822, 0.4465)
         normal_std = (0.2023, 0.1994, 0.2010)
-    elif args.dataset == "imagenet" or args.dataset == "tiny-imagenet":
+        image_size = 32
+    elif args.dataset == "tiny-imagenet":
         number_of_classes = 1000
         normal_mean = [0.4914, 0.4822, 0.4465]
         normal_std = (0.2023, 0.1994, 0.2010)
+        image_size = 64
+    elif args.dataset == "imagenet" :
+        number_of_classes = 1000
+        normal_mean = [0.4914, 0.4822, 0.4465]
+        normal_std = (0.2023, 0.1994, 0.2010)
+        image_size = 224
 
     init_distributed_mode(args)
     print(args)
@@ -92,18 +99,18 @@ def main(args):
 
     eval_transforms = transforms.Compose([
         transforms.ToTensor(),
-        transforms.CenterCrop(224),
+        transforms.CenterCrop(image_size),
         transforms.Normalize(normal_mean, normal_std)
         ])
 
     if args.dataset == "imagenet":
         train_dataset = datasets.ImageFolder(f"{args.data_dir}/train", transform=transform_train)
     elif args.dataset == "CIFAR10":
-        train_dataset = datasets.CIFAR10(root=f'{args.data_dir}/CIFAR10', train=True, download=True, transform=transform_train)
-        eval_dataset = datasets.CIFAR10(root=f'{args.data_dir}/CIFAR10', download=True, train=False, transform=transform_valid)
+        train_dataset = datasets.CIFAR10(root=f'{args.data_dir}/CIFAR10', train=True, download=True, transform=train_transforms)
+        eval_dataset = datasets.CIFAR10(root=f'{args.data_dir}/CIFAR10', download=True, train=False, transform=eval_transforms)
     elif args.dataset == "tiny-imagenet":
-        train_dataset = datasets.ImageFolder("./tiny-imagenet-200/train", transform=transform_train)
-        eval_dataset = datasets.ImageFolder("./tiny-imagenet-200/test", transform=transform_valid)
+        train_dataset = datasets.ImageFolder("./tiny-imagenet-200/train", transform=train_transforms)
+        eval_dataset = datasets.ImageFolder("./tiny-imagenet-200/test", transform=eval_transforms)
 
     train_sampler = torch.utils.data.distributed.DistributedSampler(train_dataset, shuffle=True)
     eval_sampler = torch.utils.data.distributed.DistributedSampler(eval_dataset, shuffle=True)

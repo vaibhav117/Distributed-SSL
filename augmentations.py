@@ -29,17 +29,26 @@ class Solarization(object):
 
 class TrainTransform(object):
     def __init__(self, dataset="CIFAR10"):
-        if dataset == 'imagenet' or dataset == 'tiny-imagenet':
+        if dataset == 'imagenet':
             self.mean = [0.485, 0.456, 0.406]
             self.std = [0.229, 0.224, 0.225]
+            self.crop_size = 224
+            self.padding = 0
+        elif dataset == 'tiny-imagenet':
+            self.mean = [0.485, 0.456, 0.406]
+            self.std = [0.229, 0.224, 0.225]
+            self.crop_size = 64
+            self.padding = 4
         elif dataset == 'CIFAR10':
             self.mean = [0.4914, 0.4822, 0.4465]
             self.std = (0.2023, 0.1994, 0.2010)
+            self.crop_size = 32
+            self.padding = 4
             
         self.transform = transforms.Compose(
             [
                 transforms.RandomResizedCrop(
-                    224, interpolation=InterpolationMode.BICUBIC
+                    self.crop_size, interpolation=InterpolationMode.BICUBIC, padding=self.padding
                 ),
                 transforms.RandomHorizontalFlip(p=0.5),
                 transforms.RandomApply(
@@ -62,7 +71,7 @@ class TrainTransform(object):
         self.transform_prime = transforms.Compose(
             [
                 transforms.RandomResizedCrop(
-                    224, interpolation=InterpolationMode.BICUBIC
+                    self.crop_size, interpolation=InterpolationMode.BICUBIC, padding=self.padding
                 ),
                 transforms.RandomHorizontalFlip(p=0.5),
                 transforms.RandomApply(
