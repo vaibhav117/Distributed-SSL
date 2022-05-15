@@ -139,3 +139,7 @@ CIFAR10/
 dataset/
 experiments/
 tiny-imagenet-200/
+
+# MODELS
+trained_heads/
+pretrained_backbones/

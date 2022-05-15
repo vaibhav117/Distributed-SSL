@@ -238,8 +238,8 @@ def main(args):
             wandb.log({ "backbone_loss": loss, "head_loss": head_loss, "train_accuracy": train_accuracy, "best_train_accuracy": best_train_accuracy, "runtime": int(current_time - start_time), "epoch": epoch })
             torch.save(state, args.exp_dir / args.run_name / "model.pth")
     if args.rank == 0:
-        torch.save(model.module.backbone.state_dict(), args.exp_dir / args.run_name / "final_resnet50.pth")
-        torch.save(eval_head.state_dict(), args.exp_dir / args.run_name / "final_resnet50.pth")
+        torch.save(model.module.backbone.state_dict(), args.exp_dir / args.run_name / "final_resnet50_backbone.pth")
+        torch.save(eval_head.state_dict(), args.exp_dir / args.run_name / "final_resnet50_eval_head.pth")
 
 
 def adjust_learning_rate(args, optimizer, loader, step):
