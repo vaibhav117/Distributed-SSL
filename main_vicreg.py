@@ -97,12 +97,13 @@ def main(args):
         ])
 
     if args.dataset == "imagenet":
-        train_dataset = datasets.ImageFolder(f"{args.data_dir}/train", transform=train_transforms)
-    if args.dataset == "CIFAR10":
-        train_dataset = datasets.CIFAR10(root=f'{args.data_dir}/CIFAR10', train=False, download=True, transform=train_transforms)
-        eval_dataset = datasets.CIFAR10(root=f'{args.data_dir}/CIFAR10', download=True, transform=eval_transforms)
+        train_dataset = datasets.ImageFolder(f"{args.data_dir}/train", transform=transform_train)
+    elif args.dataset == "CIFAR10":
+        train_dataset = datasets.CIFAR10(root=f'{args.data_dir}/CIFAR10', train=True, download=True, transform=transform_train)
+        eval_dataset = datasets.CIFAR10(root=f'{args.data_dir}/CIFAR10', download=True, train=False, transform=transform_valid)
     elif args.dataset == "tiny-imagenet":
-        train_dataset = datasets.ImageFolder("./tiny-imagenet-200/train", transform=train_transforms)
+        train_dataset = datasets.ImageFolder("./tiny-imagenet-200/train", transform=transform_train)
+        eval_dataset = datasets.ImageFolder("./tiny-imagenet-200/test", transform=transform_valid)
 
     train_sampler = torch.utils.data.distributed.DistributedSampler(train_dataset, shuffle=True)
     eval_sampler = torch.utils.data.distributed.DistributedSampler(eval_dataset, shuffle=True)
