@@ -98,7 +98,7 @@ def main(args):
 
     if args.dataset == "imagenet":
         train_dataset = datasets.ImageFolder(f"{args.data_dir}/train", transform=train_transforms)
-    elif args.dataset == "CIFAR10":
+    if args.dataset == "CIFAR10":
         train_dataset = datasets.CIFAR10(root=f'{args.data_dir}/CIFAR10', train=False, download=True, transform=train_transforms)
         eval_dataset = datasets.CIFAR10(root=f'{args.data_dir}/CIFAR10', download=True, transform=eval_transforms)
     elif args.dataset == "tiny-imagenet":
@@ -163,6 +163,7 @@ def main(args):
     best_train_accuracy = 0
     train_accuracy = 0
     head_loss = 0
+    supervised_optim = optim.SGD(eval_head.parameters(), lr=0.001, momentum=0.9, weight_decay=5e-4)
     
     for epoch in range(start_epoch, args.epochs):
         train_sampler.set_epoch(epoch)
@@ -205,7 +206,7 @@ def main(args):
                 for step, (image, targets) in enumerate(eval_loader, start=epoch * len(eval_loader)):
                     targets = targets.cuda(gpu, non_blocking=True)
                     image = image.cuda(gpu, non_blocking=True)
-                    supervised_optim = optim.SGD(eval_head.parameters(), lr=0.001, momentum=0.9, weight_decay=5e-4)
+                    
                     supervised_optim.zero_grad()
 
                     outputs = eval_model(image)
