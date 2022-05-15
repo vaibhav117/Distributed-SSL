@@ -131,7 +131,7 @@ def main(args):
         sampler=eval_sampler,
     )
 
-    model = VICReg(args).cuda(gpu)
+    model = Self_Supervised(args).cuda(gpu)
     model = nn.SyncBatchNorm.convert_sync_batchnorm(model)
     model = torch.nn.parallel.DistributedDataParallel(model, device_ids=[gpu])
     optimizer = LARS(
@@ -267,7 +267,7 @@ def adjust_learning_rate(args, optimizer, loader, step):
     return lr
 
 
-class VICReg(nn.Module):
+class Self_Supervised(nn.Module):
     def __init__(self, args):
         super().__init__()
         self.args = args
