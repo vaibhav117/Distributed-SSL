@@ -1,11 +1,3 @@
-# Copyright (c) Meta Platforms, Inc. and affiliates.
-
-# All rights reserved.
-
-# This source code is licensed under the license found in the
-# LICENSE file in the root directory of this source tree.
-
-
 from pathlib import Path
 import argparse
 import json
@@ -145,7 +137,7 @@ def main_worker(gpu, args):
     torch.cuda.set_device(gpu)
     torch.backends.cudnn.benchmark = True
 
-    
+
     backbone, embedding = resnet.__dict__[args.arch](zero_init_residual=True)
     state_dict = torch.load(args.pretrained, map_location="cpu")
     if "model" in state_dict:
