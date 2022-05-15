@@ -35,8 +35,8 @@ def get_arguments():
     parser.add_argument("--gpu-type", type=str, default="A100", required=True, help='Name of the run')
     parser.add_argument("--exp-dir", type=Path, default="./experiments", help='Path to the experiment folder, where all logs/checkpoints will be stored')
     parser.add_argument("--log-freq-time", type=int, default=60, help='Print logs to the stats.txt file every [log-freq-time] seconds')
-    parser.add_argument("--eval-run-at", type=int, default=5, help='Numeber of epochs after which eval loop is to be run')
-    parser.add_argument("--eval-epochs", type=int, default=5, help='Numeber of epochs to train the eval head in the eval loop')
+    parser.add_argument("--eval-run-at", type=int, default=20, help='Numeber of epochs after which eval loop is to be run')
+    parser.add_argument("--eval-epochs", type=int, default=20, help='Numeber of epochs to train the eval head in the eval loop')
 
     # Model
     parser.add_argument("--arch", type=str, default="resnet50", help='Architecture of the backbone encoder network')
