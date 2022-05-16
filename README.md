@@ -9,3 +9,8 @@ python -m torch.distributed.launch --nproc_per_node=2 train_self_supervised.py -
 ```
 python -m torch.distributed.launch --nproc_per_node=2 train_classification_downstream.py --arch resnet50 --epochs 100 --batch-size 64 --dataset CIFAR10 --data-dir ./ --run-name downstream_classification --gpu-type RTX3080
 ```
+
+### Run Command for Supervised Classification
+```
+python -m torch.distributed.launch --nproc_per_node=2 train_classification_downstream.py --arch resnet50 --epochs 100 --batch-size 64 --dataset CIFAR10 --data-dir ./ --backbone-path pretrained_backbones/final_resnet50_backbone.pth --backbone-pretraining self-supervised
+```
