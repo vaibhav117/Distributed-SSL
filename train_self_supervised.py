@@ -218,6 +218,9 @@ def main(args):
                     supervised_optim.zero_grad()
 
                     outputs = eval_model(image)
+
+                    image = torch.cat(FullGatherLayer.apply(image), dim=0)
+                    targets = torch.cat(FullGatherLayer.apply(targets), dim=0)
                         
                     head_loss = torch.nn.CrossEntropyLoss()(outputs, targets)
                     head_loss.backward()
