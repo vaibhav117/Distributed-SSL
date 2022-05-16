@@ -38,7 +38,7 @@ def get_arguments():
     # Optim
     parser.add_argument("--epochs", type=int, default=100, help='Number of epochs')
     parser.add_argument("--batch-size", type=int, default=32, help='Effective batch size (per worker batch size is [batch-size] / world-size)')
-    parser.add_argument("--eval-run-at", type=int, default=20, help='Numeber of epochs after which eval loop is to be run')
+    parser.add_argument("--eval-run-at", type=int, default=2, help='Numeber of epochs after which eval loop is to be run')
 
     # Running
     parser.add_argument("--num-workers", type=int, default=10)
@@ -69,7 +69,7 @@ def main(args):
 
     if args.rank == 0:
         os.makedirs(os.path.dirname(f"{args.head_save_path}/"), exist_ok=True)
-        wandb.init(entity= 'hpml', project=f"HPML-project_classification-train_{args.arch}" , name=f"downstream_classification_backbone-pretraining{args.backbone_pretraining}_batchsize={args.batch_size}_", tags=["train-downstream-classification",f"backbone_pretraining_type:{args.backbone_pretraining}",f"batch_size:{args.batch_size}",f"GPU_count:{args.world_size}",f"TTA:{args.tta_accuracy}",f"dataset:{args.dataset}",f"backbone_arch:{args.arch}"])
+        wandb.init(entity= 'hpml', project=f"HPML-project_classification-finetune_{args.arch}" , name=f"downstream_classification_backbone-pretraining={args.backbone_pretraining}_batchsize={args.batch_size}_", tags=["train-downstream-classification",f"backbone_pretraining_type:{args.backbone_pretraining}",f"batch_size:{args.batch_size}",f"GPU_count:{args.world_size}",f"TTA:{args.tta_accuracy}",f"dataset:{args.dataset}",f"backbone_arch:{args.arch}"])
         
     transform_train = transforms.Compose([
         transforms.RandomCrop(32, padding=4),
@@ -118,6 +118,7 @@ def main(args):
     supervised_optim = optim.SGD(head.parameters(), lr=0.001, momentum=0.9, weight_decay=5e-4)
     best_train_accuracy = 0
     best_eval_accuracy = 0
+    eval_accuracy = 0
     start_time = last_logging = time.time()
 
     for epoch in range(args.epochs):
@@ -150,10 +151,10 @@ def main(args):
                 with torch.no_grad():                
                     outputs = model(image)
                         
-                _, predicted = outputs.max(1)
-                total_eval += targets.size(0)
-                correct_eval += predicted.eq(targets).sum().item()
-                eval_accuracy = correct_eval/total_eval                
+                    _, predicted = outputs.max(1)
+                    total_eval += targets.size(0)
+                    correct_eval += predicted.eq(targets).sum().item()
+                    eval_accuracy = correct_eval/total_eval                
                 
         if args.rank == 0:
             current_time = time.time()
@@ -163,9 +164,11 @@ def main(args):
                     loss=loss.item(),
                     time=int(current_time - start_time),
                     train_accuracy=train_accuracy,
+                    eval_accuracy=eval_accuracy,
                 )
             print(json.dumps(stats))
             if eval_accuracy > best_eval_accuracy:
+                    best_eval_accuracy = eval_accuracy
                     torch.save(head.state_dict(), args.head_save_path / f"{args.backbone_pretraining}_trained_head.pth")
             wandb.log({ "eval_accuracy": eval_accuracy, "best_eval_accuracy": best_eval_accuracy, "loss": loss, "train_accuracy": train_accuracy, "best_train_accuracy": best_train_accuracy, "runtime": int(current_time - start_time), "epoch": epoch })
 
