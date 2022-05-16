@@ -228,6 +228,6 @@ def main(args):
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser('VICReg training script', parents=[get_arguments()])
+    parser = argparse.ArgumentParser('Supervised training script', parents=[get_arguments()])
     args = parser.parse_args()
     main(args)
