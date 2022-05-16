@@ -32,23 +32,36 @@ python train_supervised.py --data-dir ./random --run-name sup_resnet50_classific
 
 ### Results
 
+#### Self-Supervised DDL Model Runtime Performance
+
+
+
+Legend-
+Red: batch-size=32, 1 GPU (RTX3080)
+Green: batch-size=128, 4 GPUs (Titax X)
+Pink: batch-size=1024, 2 GPUs (RTX8000)
+
+![](results/Self_Supervised_Runtime_perf.png)
+
+#### Self-Supervised DDL Model Performance- varying Base lr
+As we decrease learning rate from 0.3 to 0.2:
+- Train Accuracy increases
+- Backbone and Head Loss decreases
+
+Legend-
+Pink: batch-size=32, num_workers=2, lr=0.3
+Red: batch-size=32, num_workers=2, lr=0.2
+
+![](results/Self_supervised_varying_lr.png)
+
 #### Downstream task performance- Image Classification
-- Accuracy attained by Self-Supervised Learning: 92.4 % in 1500 self-supervised epochs epochs and 50 supervised epochs
-- Accuracy attained by Supervised Learning (pre-trained ResNet50 using CIFAR10 dataset): 97 % in 200 epochs
-
-Supervised Model:
-![](results/Supervised_Image_Classification_accuracy.png)
-
-Self-supervised Model:
-![](results/Self_supervised_Image_Classification_accuracy.png)
+![](results/Downstream_Image_classi.png)
 
 #### Downstream task performance- RL
 
-Supervised Model:
-![](results/Supervised_RL_performance.mov)
+Supervised Model: https://youtu.be/t4i2ZUqZT_8
 
-Self-supervised Model:
-![](results/Self_supervised_RL_performance.mov)
+Self-supervised Model: https://youtu.be/Bva8LSMGHDQ
 
 ---
 ### NYU High Performance Machine Learning Final Project
