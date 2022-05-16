@@ -1,4 +1,5 @@
 import augmentations as aug
+import torch.distributed as dist
 from distributed import init_distributed_mode
 
 from pathlib import Path
