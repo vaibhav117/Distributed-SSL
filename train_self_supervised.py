@@ -219,7 +219,7 @@ def main(args):
 
                     outputs = eval_model(image)
 
-                    image = torch.cat(FullGatherLayer.apply(image), dim=0)
+                    outputs = torch.cat(FullGatherLayer.apply(outputs), dim=0)
                     targets = torch.cat(FullGatherLayer.apply(targets), dim=0)
                         
                     head_loss = torch.nn.CrossEntropyLoss()(outputs, targets)

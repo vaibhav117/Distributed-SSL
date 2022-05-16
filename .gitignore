@@ -142,4 +142,4 @@ tiny-imagenet-200/
 
 # MODELS
 trained_heads/
-#pretrained_backbones/
+pretrained_backbones/
