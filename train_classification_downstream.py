@@ -20,7 +20,7 @@ import torch
 import resnet
 
 def get_arguments():
-    parser = argparse.ArgumentParser(description="Pretrain a resnet model with VICReg", add_help=False)
+    parser = argparse.ArgumentParser(description="Pretrain a resnet model with Self Supervised", add_help=False)
 
     # Data
     parser.add_argument("--data-dir", type=Path, default="./", help='Path to the image net dataset')
@@ -186,6 +186,6 @@ def weight_init(m):
             m.bias.data.fill_(0.0)
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser('VICReg training script', parents=[get_arguments()])
+    parser = argparse.ArgumentParser('Self-Supervised training script', parents=[get_arguments()])
     args = parser.parse_args()
     main(args)
