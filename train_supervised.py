@@ -47,7 +47,7 @@ def get_arguments():
     parser.add_argument("--momentum", type=float, default=0.9, help='Momentum')
 
     # Training
-    parser.add_argument("--epochs", type=int, default=100, help='Number of epochs')
+    parser.add_argument("--epochs", type=int, default=200, help='Number of epochs')
     parser.add_argument("--batch-size", type=int, default=128, help='Effective batch size')
     
     # Running
@@ -187,7 +187,7 @@ def main(args):
             epoch_acc = current_corrects.double() / len(data_loaders[phase].dataset)
 
             # Make a copy of the model if the accuracy on the validation set has improved
-            if phase == 'validation' and epoch_acc > best_train_accuracy:
+            if phase == 'train' and epoch_acc > best_train_accuracy:
                 best_train_accuracy = epoch_acc
                 # best_model_wts = copy.deepcopy(model.state_dict())
                 torch.save(model.state_dict(), args.exp_dir / args.run_name / "best_model.pth")
@@ -205,26 +205,26 @@ def main(args):
     current_loss = 0.0
     current_corrects = 0
 
-    with torch.no_grad():
-        start_time = time.time()
-        for step, (inputs, labels) in enumerate(data_loaders['validation']):
-            inputs = inputs.to(args.device)
-            labels = labels.to(args.device)
+    start_time = time.time()
+    for epoch in range(start_epoch, args.epochs):
+        with torch.no_grad(): 
+            for step, (inputs, labels) in enumerate(data_loaders['validation']):
+                inputs = inputs.to(args.device)
+                labels = labels.to(args.device)
 
-            outputs = model(inputs)
-            _, preds = torch.max(outputs, 1)
-            loss = criterion(outputs, labels)
-            current_loss += loss.item() * inputs.size(0)
-            current_corrects += torch.sum(preds == labels.data)
+                outputs = model(inputs)
+                _, preds = torch.max(outputs, 1)
+                loss = criterion(outputs, labels)
+                current_loss += loss.item() * inputs.size(0)
+                current_corrects += torch.sum(preds == labels.data)
 
-        valid_loss = current_loss / len(data_loaders['validation'].dataset)
-        valid_acc = current_corrects.double() / len(data_loaders['validation'].dataset)
+            valid_loss = current_loss / len(data_loaders['validation'].dataset)
+            valid_acc = current_corrects.double() / len(data_loaders['validation'].dataset)
 
-        current_time = time.time()
-        wandb.log({ "valid_loss": valid_loss, "valid_accuracy": valid_acc, "runtime": int(current_time - start_time)})
+            current_time = time.time()
+            wandb.log({ "valid_loss": valid_loss, "valid_accuracy": valid_acc, "runtime": int(current_time - start_time)})
 
-
-        model.train(mode=was_training)
+    model.train(mode=was_training)
 
 
 if __name__ == "__main__":
