@@ -48,7 +48,7 @@ Legend-
 - Green: batch-size=128, 4 GPUs (Titax X)
 - Pink: batch-size=1024, 2 GPUs (RTX8000)
 
-![](results/Self_Supervised_Epoch_perf.png)
+![](results/Self_Supervised_Epoch_perf1.png)
 
 #### Self-Supervised DDL Model Performance- varying Base lr
 
