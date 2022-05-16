@@ -38,6 +38,7 @@ def get_arguments():
     # Optim
     parser.add_argument("--epochs", type=int, default=100, help='Number of epochs')
     parser.add_argument("--batch-size", type=int, default=32, help='Effective batch size (per worker batch size is [batch-size] / world-size)')
+    parser.add_argument("--eval-run-at", type=int, default=20, help='Numeber of epochs after which eval loop is to be run')
 
     # Running
     parser.add_argument("--num-workers", type=int, default=10)
@@ -116,12 +117,13 @@ def main(args):
     #---------------------------------------------------------
     supervised_optim = optim.SGD(head.parameters(), lr=0.001, momentum=0.9, weight_decay=5e-4)
     best_train_accuracy = 0
+    best_eval_accuracy = 0
     start_time = last_logging = time.time()
 
     for epoch in range(args.epochs):
         total_train = 0
         correct_train = 0
-        for step, (image, targets) in enumerate(train_loader, start=epoch * len(eval_loader)):
+        for step, (image, targets) in enumerate(train_loader, start=epoch * len(train_loader)):
             targets = targets.cuda(gpu, non_blocking=True)
             image = image.cuda(gpu, non_blocking=True)
             
@@ -137,6 +139,22 @@ def main(args):
             correct_train += predicted.eq(targets).sum().item()
             train_accuracy = correct_train/total_train
             
+        
+        if epoch%args.eval_run_at==0:
+            total_eval = 0
+            correct_eval = 0
+            for step, (image, targets) in enumerate(eval_loader, start=epoch * len(eval_loader)):
+                targets = targets.cuda(gpu, non_blocking=True)
+                image = image.cuda(gpu, non_blocking=True)
+                
+                with torch.no_grad():                
+                    outputs = model(image)
+                        
+                _, predicted = outputs.max(1)
+                total_eval += targets.size(0)
+                correct_eval += predicted.eq(targets).sum().item()
+                eval_accuracy = correct_eval/total_eval                
+                
         if args.rank == 0:
             current_time = time.time()
             stats = dict(
@@ -147,10 +165,9 @@ def main(args):
                     train_accuracy=train_accuracy,
                 )
             print(json.dumps(stats))
-            if train_accuracy > best_train_accuracy:
-                torch.save(head.state_dict(), args.head_save_path / f"{args.backbone_pretraining}_trained_head.pth")
-            wandb.log({ "loss": loss, "train_accuracy": train_accuracy, "best_train_accuracy": best_train_accuracy, "runtime": int(current_time - start_time), "epoch": epoch })
-
+            if eval_accuracy > best_eval_accuracy:
+                    torch.save(head.state_dict(), args.head_save_path / f"{args.backbone_pretraining}_trained_head.pth")
+            wandb.log({ "eval_accuracy": eval_accuracy, "best_eval_accuracy": best_eval_accuracy, "loss": loss, "train_accuracy": train_accuracy, "best_train_accuracy": best_train_accuracy, "runtime": int(current_time - start_time), "epoch": epoch })
 
 
 def get_model(args, backbone, embedding_size, number_of_classes, gpu):
