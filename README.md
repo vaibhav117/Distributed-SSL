@@ -34,8 +34,6 @@ python train_supervised.py --data-dir ./random --run-name sup_resnet50_classific
 
 #### Self-Supervised DDL Model Runtime Performance
 
-
-
 Legend-
 Red: batch-size=32, 1 GPU (RTX3080)
 Green: batch-size=128, 4 GPUs (Titax X)
@@ -44,9 +42,6 @@ Pink: batch-size=1024, 2 GPUs (RTX8000)
 ![](results/Self_Supervised_Runtime_perf.png)
 
 #### Self-Supervised DDL Model Performance- varying Base lr
-As we decrease learning rate from 0.3 to 0.2:
-- Train Accuracy increases
-- Backbone and Head Loss decreases
 
 Legend-
 Pink: batch-size=32, num_workers=2, lr=0.3
@@ -60,7 +55,6 @@ Red: batch-size=32, num_workers=2, lr=0.2
 #### Downstream task performance- RL
 
 Supervised Model: https://youtu.be/t4i2ZUqZT_8
-
 Self-supervised Model: https://youtu.be/Bva8LSMGHDQ
 
 ---
