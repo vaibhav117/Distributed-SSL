@@ -1,6 +1,4 @@
-# HPML-project
-
-## Distributed Self-supervised Learning for the generation of Image Embeddings
+## HPML-project : Distributed Self-supervised Learning for the generation of Image Embeddings
 
 ### Goal
 
@@ -32,7 +30,8 @@ python -m torch.distributed.launch --nproc_per_node=2 train_classification_downs
 python train_supervised.py --data-dir ./random --run-name sup_resnet50_classification --gpu-type RTX8000 --arch resnet50 --epochs 200 --batch-size 128
 ```
 
-### Results:
+### Results
+
 
 
 ---
