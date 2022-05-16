@@ -37,18 +37,18 @@ python train_supervised.py --data-dir ./random --run-name sup_resnet50_classific
 - Accuracy attained by Supervised Learning (pre-trained ResNet50 using CIFAR10 dataset): 97 % in 200 epochs
 
 Supervised Model:
-![](/results/Supervised Image Classification_accuracy.png)
+![](results/Supervised Image Classification_accuracy.png)
 
 Self-supervised Model:
-![](/results/Self-supervised Image Classification_accuracy.png)
+![](results/Self-supervised Image Classification_accuracy.png)
 
 #### Downstream task performance- RL
 
 Supervised Model:
-![](/results/Supervised RL performance.mov)
+![](results/Supervised RL performance.mov)
 
 Self-supervised Model:
-![](/results/Self-supervised RL performance.mov)
+![](results/Self-supervised RL performance.mov)
 
 ---
 ### NYU High Performance Machine Learning Final Project
