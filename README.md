@@ -41,6 +41,10 @@ Legend-
 
 ![](results/Self_Supervised_Runtime_perf.png)
 
+#### Self-Supervised DDL Model Epoch Performance
+
+
+
 #### Self-Supervised DDL Model Performance- varying Base lr
 
 Legend-
@@ -49,14 +53,16 @@ Legend-
 
 ![](results/Self_supervised_varying_lr.png)
 
-#### Downstream task performance- Image Classification
-![](results/Downstream_Image_classi.png)
-
 #### Downstream task performance- RL
 
 - Supervised Model: https://youtu.be/t4i2ZUqZT_8
 - Self-supervised Model: https://youtu.be/Bva8LSMGHDQ
 
+#### Downstream task performance- Image Classification
+![](results/Downstream_Image_classi.png)
+
+
+
 ---
-### NYU High Performance Machine Learning Final Project
-### Vaibhav Mathur (vm2134) and Harini Appansrinivasan (ha1642)
+#### NYU High Performance Machine Learning Final Project
+#### Vaibhav Mathur (vm2134) and Harini Appansrinivasan (ha1642)
