@@ -1,4 +1,4 @@
-## HPML-project : Distributed Self-supervised Learning for the generation of Image Embeddings
+## Distributed Self-supervised Learning for the generation of Image Embeddings
 
 ### Goal
 
@@ -43,7 +43,12 @@ Legend-
 
 #### Self-Supervised DDL Model Epoch Performance
 
+Legend-
+- Red: batch-size=32, 1 GPU (RTX3080)
+- Green: batch-size=128, 4 GPUs (Titax X)
+- Pink: batch-size=1024, 2 GPUs (RTX8000)
 
+![](results/Self_Supervised_Epoch_perf.png)
 
 #### Self-Supervised DDL Model Performance- varying Base lr
 
@@ -64,5 +69,5 @@ Legend-
 
 
 ---
-#### NYU High Performance Machine Learning Final Project
-#### Vaibhav Mathur (vm2134) and Harini Appansrinivasan (ha1642)
+##### NYU High Performance Machine Learning Final Project
+##### Vaibhav Mathur (vm2134) and Harini Appansrinivasan (ha1642)
